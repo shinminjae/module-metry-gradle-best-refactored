@@ -28,7 +28,7 @@ aws:
   iot:
     endpoint: a1vopgopgy3eh3-ats.iot.ap-northeast-2.amazonaws.com
     clientId: metry-local-daedong-agmtms
-    certificateFile: D:/aws/tms_kr_local_setting_key/MZC-Test-Thing-01.cert.pem
-    privateKeyFile: D:/aws/tms_kr_local_setting_key/MZC-Test-Thing-01.private.key
-    rootCAFile: D:/aws/labfarm_kr/local_setting/AmazonRootCA1.pem
+    certificateFile: certs/MZC-Test-Thing-01.cert.pem
+    privateKeyFile: certs/MZC-Test-Thing-01.private.key
+    rootCAFile: certs/AmazonRootCA1.pem
     topics: DDTM/TRIP/+,DDTM/INIT/+,DDTM/DTC/+,DDTM/RO/+,DDTM/ACC/+,DDTM/MAP/+   # ✅ 쉼표로 구분된 문자열로 변경
