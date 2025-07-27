@@ -5,8 +5,7 @@ spring:
     driver-class-name: org.sqlite.JDBC
   sql:
     init:
-      mode: always
-      schema-locations: classpath:sql/mapper/schema.sql
+      mode: never
       continue-on-error: true
   thymeleaf:
     cache: false

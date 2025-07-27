@@ -20,6 +20,27 @@ import java.util.List;
 public class IotMessageController {
     private final IotMessageService service;
 
+    // 메인 페이지
+    @GetMapping("/")
+    public String home() {
+        return "redirect:/search";
+    }
+
+    // 검색 페이지 초기 로드
+    @GetMapping("/search")
+    public String searchPage(Model model) {
+        try {
+            // 초기 페이지 로드 시 최근 20개 메시지 표시
+            List<IotMessageDto> result = service.searchMessages(null, null, null, null, null, null, null, 1, 20, "DESC");
+            model.addAttribute("messages", result);
+        } catch (Exception e) {
+            // 오류 발생 시 빈 리스트로 초기화
+            model.addAttribute("messages", new java.util.ArrayList<>());
+            model.addAttribute("error", "데이터를 불러오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+        return "search";
+    }
+
     @PostMapping("/search")
     public String search(@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime startDate,
                          @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime endDate,

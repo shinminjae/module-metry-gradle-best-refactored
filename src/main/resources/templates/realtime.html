@@ -3,34 +3,176 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>실시간 수신 상태</title>
+    <title>실시간 IoT 데이터 모니터링</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-connected { background-color: #28a745; }
+        .status-disconnected { background-color: #dc3545; }
+        .auto-refresh {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
     <script>
+        let isAutoRefresh = true;
+        let refreshInterval;
+
         async function loadMessages() {
-            const response = await fetch('/realtime');
-            const data = await response.json();
+            try {
+                const response = await fetch('/api/realtime');
+                const data = await response.json();
+                updateMessagesTable(data);
+                updateStatus(true);
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                updateStatus(false);
+            }
+        }
+
+        function updateMessagesTable(messages) {
             const container = document.getElementById('messages');
             container.innerHTML = '';
-            data.forEach(msg => {
-                container.innerHTML += `<tr>
-                    <td>${msg.receivedAt}</td>
-                    <td>${msg.deviceId}</td>
-                    <td>${msg.topic}</td>
-                    <td>${msg.dataType}</td>
-                    <td>${msg.value ?? ''}</td>
-                    <td>${msg.rawMessage}</td>
-                </tr>`;
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">수신된 메시지가 없습니다.</td></tr>';
+                return;
+            }
+
+            messages.forEach(msg => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDateTime(msg.receivedAt)}</td>
+                    <td><span class="badge bg-primary">${msg.deviceId || 'UNKNOWN'}</span></td>
+                    <td><code>${msg.topic}</code></td>
+                    <td><span class="badge bg-info">${msg.dataType || 'N/A'}</span></td>
+                    <td>${msg.value !== null ? msg.value : '-'}</td>
+                    <td><small class="text-muted">${msg.rawMessage ? msg.rawMessage.substring(0, 100) + (msg.rawMessage.length > 100 ? '...' : '') : '-'}</small></td>
+                `;
+                container.appendChild(row);
             });
         }
-        setInterval(loadMessages, 3000);
-        window.onload = loadMessages;
+
+        function updateStatus(isConnected) {
+            const statusElement = document.getElementById('connection-status');
+            const statusText = document.getElementById('status-text');
+            
+            if (isConnected) {
+                statusElement.className = 'status-indicator status-connected';
+                statusText.textContent = '연결됨';
+                statusText.className = 'text-success';
+            } else {
+                statusElement.className = 'status-indicator status-disconnected';
+                statusText.textContent = '연결 끊김';
+                statusText.className = 'text-danger';
+            }
+        }
+
+        function formatDateTime(dateTimeString) {
+            if (!dateTimeString) return '-';
+            const date = new Date(dateTimeString);
+            return date.toLocaleString('ko-KR');
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefresh = !isAutoRefresh;
+            const button = document.getElementById('toggle-refresh');
+            
+            if (isAutoRefresh) {
+                button.textContent = '자동 새로고침 중지';
+                button.className = 'btn btn-warning btn-sm';
+                refreshInterval = setInterval(loadMessages, 3000);
+            } else {
+                button.textContent = '자동 새로고침 시작';
+                button.className = 'btn btn-success btn-sm';
+                clearInterval(refreshInterval);
+            }
+        }
+
+        function manualRefresh() {
+            loadMessages();
+        }
+
+        // 초기 로드 및 자동 새로고침 시작
+        window.onload = function() {
+            loadMessages();
+            refreshInterval = setInterval(loadMessages, 3000);
+        };
     </script>
 </head>
 <body class="container mt-4">
-<h2>실시간 수신 상태</h2>
-<table class="table table-bordered mt-3">
-<thead><tr><th>수신시각</th><th>디바이스ID</th><th>토픽</th><th>데이터타입</th><th>값</th><th>원본메시지</th></tr></thead>
-<tbody id="messages"></tbody>
-</table>
+    <div class="row">
+        <div class="col-md-8">
+            <h2><i class="bi bi-activity"></i> 실시간 IoT 데이터 모니터링</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <span id="connection-status" class="status-indicator status-connected"></span>
+            <span id="status-text" class="text-success">연결됨</span>
+        </div>
+    </div>
+
+    <div class="auto-refresh">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <strong>자동 새로고침:</strong> 3초마다 최신 데이터를 자동으로 업데이트합니다.
+            </div>
+            <div class="col-md-6 text-end">
+                <button id="toggle-refresh" class="btn btn-warning btn-sm" onclick="toggleAutoRefresh()">
+                    자동 새로고침 중지
+                </button>
+                <button class="btn btn-primary btn-sm ms-2" onclick="manualRefresh()">
+                    <i class="bi bi-arrow-clockwise"></i> 새로고침
+                </button>
+                <a href="/search" class="btn btn-secondary btn-sm ms-2">
+                    <i class="bi bi-search"></i> 검색 페이지
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">최근 수신 메시지 (최대 50개)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>수신시각</th>
+                            <th>디바이스ID</th>
+                            <th>토픽</th>
+                            <th>데이터타입</th>
+                            <th>값</th>
+                            <th>원본메시지</th>
+                        </tr>
+                    </thead>
+                    <tbody id="messages">
+                        <!-- 초기 데이터 로딩 -->
+                        <tr th:each="msg : ${messages}">
+                            <td th:text="${#temporals.format(msg.receivedAt, 'yyyy-MM-dd HH:mm:ss')}">-</td>
+                            <td><span class="badge bg-primary" th:text="${msg.deviceId}">UNKNOWN</span></td>
+                            <td><code th:text="${msg.topic}">-</code></td>
+                            <td><span class="badge bg-info" th:text="${msg.dataType}">N/A</span></td>
+                            <td th:text="${msg.value}">-</td>
+                            <td><small class="text-muted" th:text="${msg.rawMessage != null ? (msg.rawMessage.length() > 100 ? msg.rawMessage.substring(0, 100) + '...' : msg.rawMessage) : '-'}">-</small></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3 text-center text-muted">
+        <small>마지막 업데이트: <span id="last-update"></span></small>
+    </div>
 </body>
 </html>
