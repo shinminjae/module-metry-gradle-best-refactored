@@ -3,8 +3,24 @@ spring:
   datasource:
     url: jdbc:sqlite:data/iot_messages.db
     driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/mapper/schema.sql
+      continue-on-error: true
   thymeleaf:
     cache: false
+
+# MyBatis 설정
+mybatis:
+  mapper-locations: classpath:sql/mapper/IotMessageMapper.xml
+  type-aliases-package: com.daedong.agmtms.metry.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
 server:
   port: 8080
 
@@ -16,4 +32,4 @@ aws:
     certificateFile: D:/aws/tms_kr_local_setting_key/MZC-Test-Thing-01.cert.pem
     privateKeyFile: D:/aws/tms_kr_local_setting_key/MZC-Test-Thing-01.private.key
     rootCAFile: D:/aws/labfarm_kr/local_setting/AmazonRootCA1.pem
-    topics: DDTM/TRIP/+   # ✅ 쉼표로 구분된 문자열로 변경
+    topics: DDTM/TRIP/+,DDTM/INIT/+,DDTM/DTC/+,DDTM/RO/+,DDTM/ACC/+,DDTM/MAP/+   # ✅ 쉼표로 구분된 문자열로 변경

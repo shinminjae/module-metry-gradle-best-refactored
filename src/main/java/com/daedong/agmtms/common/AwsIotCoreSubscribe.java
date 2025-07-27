@@ -3,13 +3,20 @@ package com.daedong.agmtms.common;
 
 import com.daedong.agmtms.metry.dto.IotMessageDto;
 import com.daedong.agmtms.metry.services.IotMessageService;
+import com.daedong.agmtms.metry.service.acc.AccMetryService;
+import com.daedong.agmtms.metry.service.dtc.DtcMetryService;
+import com.daedong.agmtms.metry.service.init.InitMetryService;
+import com.daedong.agmtms.metry.service.map.MapMetryService;
+import com.daedong.agmtms.metry.service.ro.RoMetryService;
+import com.daedong.agmtms.metry.service.trip.TripMetryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.crt.mqtt.MqttClientConnection;
-import software.amazon.awssdk.crt.mqtt.QualityOfService;
-import software.amazon.awssdk.iot.AwsIotMqttConnectionBuilder;
+import software.amazon.awssdk.crt.mqtt5.*;
+import software.amazon.awssdk.crt.mqtt5.packets.PublishPacket;
+import software.amazon.awssdk.crt.mqtt5.packets.SubscribePacket;
+import software.amazon.awssdk.iot.AwsIotMqtt5ClientBuilder;
 
 import jakarta.annotation.PostConstruct;
 import java.io.File;
@@ -41,100 +48,95 @@ public class AwsIotCoreSubscribe {
     private final String keyPath = "certs/MZC-Test-Thing-01.private.key";
     private final String rootCaPath = "certs/AmazonRootCA1.pem";
 
+    // MQTT5 기반 구독 메서드
+    public void AwsIotCoreSub(Mqtt5Client client, List<String> topics) {
+        try {
+            log.info("Subscribing to topics: {}", topics);
+            
+            for (String topic : topics) {
+                client.subscribe(new SubscribePacket.SubscribePacketBuilder()
+                    .withSubscription(topic, QOS.AT_LEAST_ONCE)
+                    .build());
+                log.info("Subscribed to topic: {}", topic);
+            }
+        } catch (Exception e) {
+            log.error("Failed to subscribe to topics: {}", e.getMessage(), e);
+        }
+    }
+
+    // MQTT5 이벤트 핸들러 클래스
+    public static class AwsIotCoreSubEvents implements Mqtt5ClientOptions.PublishEvents {
+        private final InitMetryService initMetryService;
+        private final DtcMetryService dtcMetryService;
+        private final RoMetryService roMetryService;
+        private final TripMetryService tripMetryService;
+        private final AccMetryService accMetryService;
+        private final MapMetryService mapMetryService;
+
+        public AwsIotCoreSubEvents(InitMetryService initMetryService, DtcMetryService dtcMetryService,
+                                 RoMetryService roMetryService, TripMetryService tripMetryService,
+                                 AccMetryService accMetryService, MapMetryService mapMetryService) {
+            this.initMetryService = initMetryService;
+            this.dtcMetryService = dtcMetryService;
+            this.roMetryService = roMetryService;
+            this.tripMetryService = tripMetryService;
+            this.accMetryService = accMetryService;
+            this.mapMetryService = mapMetryService;
+        }
+
+        @Override
+        public void onMessageReceived(Mqtt5Client client, PublishReturn publishReturn) {
+            PublishPacket publishPacket = publishReturn.getPublishPacket();
+            String topic = publishPacket.getTopic();
+            String payload = new String(publishPacket.getPayload(), StandardCharsets.UTF_8);
+            
+            log.info("Received message: topic={}, payload={}", topic, payload);
+            
+            // 토픽에 따라 적절한 서비스로 라우팅
+            if (topic.contains("/INIT/")) {
+                initMetryService.processInitMessage(topic, payload);
+            } else if (topic.contains("/DTC/")) {
+                dtcMetryService.processDtcMessage(topic, payload);
+            } else if (topic.contains("/RO/")) {
+                roMetryService.processRoMessage(topic, payload);
+            } else if (topic.contains("/TRIP/")) {
+                tripMetryService.processTripMessage(topic, payload);
+            } else if (topic.contains("/ACC/")) {
+                accMetryService.processAccMessage(topic, payload);
+            } else if (topic.contains("/MAP/")) {
+                mapMetryService.processMapMessage(topic, payload);
+            } else {
+                // 기본 처리
+                processDefaultMessage(topic, payload);
+            }
+        }
+
+        private void processDefaultMessage(String topic, String payload) {
+            try {
+                String[] parts = topic.split("/");
+                String dataType = parts.length > 1 ? parts[1] : "UNKNOWN";
+                String deviceId = parts.length > 2 ? parts[2] : "UNKNOWN";
+
+                IotMessageDto dto = IotMessageDto.builder()
+                        .deviceId(deviceId)
+                        .topic(topic)
+                        .payload(payload)
+                        .dataType(dataType)
+                        .value(null)
+                        .receivedAt(LocalDateTime.now())
+                        .rawMessage(payload)
+                        .build();
+
+                // 기본 메시지 서비스로 저장
+                // messageService.saveMessage(dto);
+            } catch (Exception e) {
+                log.error("Error processing default message", e);
+            }
+        }
+    }
+
     @PostConstruct
     public void subscribe() {
-        try {
-            validateCertificates();
-
-            log.info("Using certPath: {}", certPath);
-            log.info("Using keyPath: {}", keyPath);
-            log.info("Using rootCaPath: {}", rootCaPath);
-            log.info("Using endpoint: {}", endpoint);
-            log.info("Using clientId: {}", clientId);
-            log.info("Subscribing to topics: {}", topics);
-
-            AwsIotMqttConnectionBuilder builder =
-                    AwsIotMqttConnectionBuilder.newMtlsBuilderFromPath(certPath, keyPath);
-
-            builder.withCertificateAuthorityFromPath(null, rootCaPath)
-                    .withEndpoint(endpoint)
-                    .withClientId(clientId + "-" + UUID.randomUUID())
-                    .withCleanSession(true);
-
-            try (MqttClientConnection connection = builder.build()) {
-                CompletableFuture<Boolean> connected = connection.connect();
-                connected.whenComplete((result, error) -> {
-                    if (error != null) {
-                        log.error("[AWS-IOT-ERROR] ","AWS IoT Connection error: {} - {}", error.getClass().getName(), error.getMessage(), error);
-                    } else if (!result) {
-                        log.error("[AWS-IOT-ERROR] ","Connection failed. Check your network, endpoint, certificate, and AWS IoT policy.. Check endpoint, certificate, and policy.");
-                    } else {
-                        log.info("Connected to AWS IoT Core");
-                        topics.forEach(topic -> {
-                            try {
-                                connection.subscribe(topic, QualityOfService.AT_LEAST_ONCE,
-                                        message -> processMessage(message.getTopic(), message.getPayload()));
-                                log.info("Subscribed to topic: {}", topic);
-                            } catch (Exception e) {
-                                log.error("[AWS-IOT-ERROR] ","Failed to subscribe to topic {}: {}", topic, e.getMessage(), e);
-                            }
-                        });
-                    }
-                });
-
-                while (true) {
-                    Thread.sleep(10000);
-                }
-            }
-        } catch (Exception e) {
-            log.error("[AWS-IOT-ERROR] ","AWS IoT Subscribe fatal error: {} - {}", e.getClass().getName(), e.getMessage(), e);
-        }
-    }
-
-    private void validateCertificates() {
-        validatePemFile(certPath, "Device Certificate");
-        validatePemFile(keyPath, "Private Key");
-        validatePemFile(rootCaPath, "Root CA");
-    }
-
-    private void validatePemFile(String path, String name) {
-        File file = new File(path);
-        if (!file.exists()) {
-            throw new RuntimeException(name + " file not found: " + path);
-        }
-        try {
-            String content = Files.readString(file.toPath());
-            if (!content.contains("-----BEGIN") || !content.contains("-----END")) {
-                throw new RuntimeException(name + " is not a valid PEM format: " + path);
-            }
-            log.info("{} validated successfully: {}", name, path);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read " + name + ": " + path, e);
-        }
-    }
-
-    private void processMessage(String topic, byte[] payload) {
-        try {
-            String message = new String(payload, StandardCharsets.UTF_8);
-            log.info("Received :: topic={} payload={}", topic, message);
-
-            String[] parts = topic.split("/");
-            String dataType = parts.length > 1 ? parts[1] : "UNKNOWN";
-            String deviceId = parts.length > 2 ? parts[2] : "UNKNOWN";
-
-            IotMessageDto dto = IotMessageDto.builder()
-                    .deviceId(deviceId)
-                    .topic(topic)
-                    .payload(message)
-                    .dataType(dataType)
-                    .value(null)
-                    .receivedAt(LocalDateTime.now())
-                    .rawMessage(message)
-                    .build();
-
-            messageService.saveMessage(dto);
-        } catch (Exception e) {
-            log.error("[AWS-IOT-ERROR] ","Error processing message", e);
-        }
+        log.info("AwsIotCoreSubscribe initialized - MQTT5 configuration will be handled by AwsIotCoreConfig");
     }
 }

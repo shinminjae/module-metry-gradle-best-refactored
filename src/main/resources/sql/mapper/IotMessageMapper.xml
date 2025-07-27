@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
@@ -34,4 +33,4 @@
             SELECT id FROM iot_messages ORDER BY received_at ASC LIMIT #{deleteCount}
         )
     </delete>
-</mapper>
+</mapper> 

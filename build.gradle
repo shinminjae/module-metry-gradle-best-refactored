@@ -24,6 +24,9 @@ dependencies {
     implementation 'software.amazon.awssdk.crt:aws-crt:0.29.15'
     implementation 'software.amazon.awssdk.iotdevicesdk:aws-iot-device-sdk:1.19.1'
 
+    // Apache Commons Lang3
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 

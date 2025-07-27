@@ -10,16 +10,17 @@ Module Metry는 AWS IoT Core를 통해 실시간 IoT 디바이스 데이터를 �
 - **Database**: SQLite
 - **ORM**: MyBatis
 - **Frontend**: Thymeleaf, Bootstrap 5.3.0
-- **AWS IoT**: AWS IoT Device SDK (CRT 기반)
+- **AWS IoT**: AWS IoT Device SDK (MQTT5 기반)
 - **Build Tool**: Gradle
-- **기타**: Lombok
+- **기타**: Lombok, Apache Commons Lang3
 
 ## 🚀 주요 기능
 
-### 1. AWS IoT Core 구독
-- MQTT 프로토콜을 통한 실시간 데이터 수신
-- 다중 토픽 구독 지원
+### 1. AWS IoT Core 구독 (MQTT5)
+- MQTT5 프로토콜을 통한 실시간 데이터 수신
+- 다중 토픽 구독 지원 (INIT, DTC, RO, TRIP, ACC, MAP)
 - 인증서 기반 보안 연결
+- 토픽별 메시지 처리 서비스 분리
 
 ### 2. 데이터 수집 및 저장
 - SQLite 데이터베이스에 IoT 메시지 저장
@@ -42,7 +43,10 @@ module-metry-gradle-best/
 │       ├── java/
 │       │   └── com/daedong/agmtms/
 │       │       ├── common/
-│       │       │   └── AwsIotCoreSubscribe.java    # AWS IoT 구독 처리
+│       │       │   └── AwsIotCoreSubscribe.java    # AWS IoT MQTT5 이벤트 핸들러
+│       │       ├── config/
+│       │       │   ├── AwsIotCoreConfig.java       # AWS IoT MQTT5 설정
+│       │       │   └── DatabaseConfig.java         # 데이터베이스 초기화 설정
 │       │       ├── metry/
 │       │       │   ├── controllers/
 │       │       │   │   ├── IotMessageController.java    # 메인 컨트롤러
@@ -51,8 +55,21 @@ module-metry-gradle-best/
 │       │       │   │   └── IotMessageMapper.java        # MyBatis 매퍼
 │       │       │   ├── dto/
 │       │       │   │   └── IotMessageDto.java           # 데이터 전송 객체
-│       │       │   └── services/
-│       │       │       └── IotMessageService.java       # 비즈니스 로직
+│       │       │   ├── services/
+│       │       │   │   └── IotMessageService.java       # 비즈니스 로직
+│       │       │   └── service/
+│       │       │       ├── acc/
+│       │       │       │   └── AccMetryService.java     # ACC 메시지 처리
+│       │       │       ├── dtc/
+│       │       │       │   └── DtcMetryService.java     # DTC 메시지 처리
+│       │       │       ├── init/
+│       │       │       │   └── InitMetryService.java    # INIT 메시지 처리
+│       │       │       ├── map/
+│       │       │       │   └── MapMetryService.java     # MAP 메시지 처리
+│       │       │       ├── ro/
+│       │       │       │   └── RoMetryService.java      # RO 메시지 처리
+│       │       │       └── trip/
+│       │       │           └── TripMetryService.java    # TRIP 메시지 처리
 │       │       └── ModuleMetryApplication.java          # 메인 애플리케이션
 │       └── resources/
 │           ├── application.yml                           # 애플리케이션 설정
@@ -80,10 +97,17 @@ aws:
     certificateFile: path/to/certificate.pem
     privateKeyFile: path/to/private-key.pem
     rootCAFile: path/to/root-ca.pem
-    topics: DDTM/TRIP/+, DDTM/STATUS/+   # 구독할 토픽들
+    topics: DDTM/TRIP/+,DDTM/INIT/+,DDTM/DTC/+,DDTM/RO/+,DDTM/ACC/+,DDTM/MAP/+   # 구독할 토픽들
 ```
 
-### 2. 인증서 파일
+### 2. 데이터베이스 설정
+
+애플리케이션은 자동으로 다음을 수행합니다:
+- `data/` 디렉토리 자동 생성
+- SQLite 데이터베이스 파일 자동 생성
+- 테이블 스키마 자동 초기화
+
+### 3. 인증서 파일
 
 `certs/` 디렉토리에 다음 파일들을 배치해야 합니다:
 - `MZC-Test-Thing-01.cert.pem` - 디바이스 인증서
