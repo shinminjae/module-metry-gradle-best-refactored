@@ -21,7 +21,7 @@ public class RealtimeController {
     public String realtimePage(Model model) {
         try {
             // 최근 50개 메시지를 모델에 추가
-            List<IotMessageDto> messages = service.searchMessages(null, null, null, null, null, null, null, 1, 50, "DESC");
+            List<IotMessageDto> messages = service.getAllMessagesSimpleDirect();
             model.addAttribute("messages", messages);
         } catch (Exception e) {
             // 오류 발생 시 빈 리스트로 초기화
@@ -36,7 +36,7 @@ public class RealtimeController {
     @ResponseBody
     public List<IotMessageDto> getRealtimeMessages() {
         try {
-            return service.searchMessages(null, null, null, null, null, null, null, 1, 50, "DESC");
+            return service.getAllMessagesSimpleDirect();
         } catch (Exception e) {
             // 오류 발생 시 빈 리스트 반환
             return new java.util.ArrayList<>();

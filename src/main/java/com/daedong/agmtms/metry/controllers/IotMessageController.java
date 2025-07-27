@@ -31,7 +31,7 @@ public class IotMessageController {
     public String searchPage(Model model) {
         try {
             // 초기 페이지 로드 시 최근 20개 메시지 표시
-            List<IotMessageDto> result = service.searchMessages(null, null, null, null, null, null, null, 1, 20, "DESC");
+            List<IotMessageDto> result = service.getAllMessagesSimpleDirect();
             model.addAttribute("messages", result);
         } catch (Exception e) {
             // 오류 발생 시 빈 리스트로 초기화

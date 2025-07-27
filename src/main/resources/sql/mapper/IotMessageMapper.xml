@@ -5,8 +5,8 @@
 <mapper namespace="com.daedong.agmtms.metry.dao.IotMessageMapper">
 
     <insert id="insertMessage">
-        INSERT INTO iot_messages (device_id, topic, payload, data_type, value, received_at, raw_message)
-        VALUES (#{deviceId}, #{topic}, #{payload}, #{dataType}, #{value}, #{receivedAt}, #{rawMessage})
+        INSERT INTO iot_messages (device_id, topic, payload, data_type, value, received_at, raw_message, created_at)
+        VALUES (#{deviceId}, #{topic}, #{payload}, #{dataType}, #{value}, #{receivedAt}, #{rawMessage}, #{createdAt})
     </insert>
 
     <select id="searchMessages" resultType="com.daedong.agmtms.metry.dto.IotMessageDto">
@@ -19,7 +19,11 @@
         <if test="dataType != null and dataType != ''"> AND data_type = #{dataType}</if>
         <if test="minValue != null"> AND value &gt;= #{minValue}</if>
         <if test="maxValue != null"> AND value &lt;= #{maxValue}</if>
-        ORDER BY received_at ${sort}
+        ORDER BY received_at 
+        <choose>
+            <when test="sort == 'ASC'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
@@ -33,4 +37,8 @@
             SELECT id FROM iot_messages ORDER BY received_at ASC LIMIT #{deleteCount}
         )
     </delete>
+    
+    <select id="getAllMessagesSimple" resultType="com.daedong.agmtms.metry.dto.IotMessageDto">
+        SELECT * FROM iot_messages ORDER BY received_at DESC LIMIT 50
+    </select>
 </mapper> 

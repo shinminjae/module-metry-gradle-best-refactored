@@ -25,4 +25,6 @@ public interface IotMessageMapper {
     int countMessages();
 
     void deleteOldestMessages(@Param("deleteCount") int deleteCount);
+    
+    List<IotMessageDto> getAllMessagesSimple();
 }

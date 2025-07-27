@@ -18,4 +18,5 @@ public class IotMessageDto {
     private Double value;
     private LocalDateTime receivedAt;
     private String rawMessage;
+    private LocalDateTime createdAt;
 }
