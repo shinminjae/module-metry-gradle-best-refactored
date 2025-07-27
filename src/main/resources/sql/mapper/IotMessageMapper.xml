@@ -1,0 +1,37 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.daedong.agmtms.metry.dao.IotMessageMapper">
+
+    <insert id="insertMessage">
+        INSERT INTO iot_messages (device_id, topic, payload, data_type, value, received_at, raw_message)
+        VALUES (#{deviceId}, #{topic}, #{payload}, #{dataType}, #{value}, #{receivedAt}, #{rawMessage})
+    </insert>
+
+    <select id="searchMessages" resultType="com.daedong.agmtms.metry.dto.IotMessageDto">
+        SELECT * FROM iot_messages
+        WHERE 1=1
+        <if test="startDate != null"> AND received_at &gt;= #{startDate}</if>
+        <if test="endDate != null"> AND received_at &lt;= #{endDate}</if>
+        <if test="deviceId != null and deviceId != ''"> AND device_id = #{deviceId}</if>
+        <if test="topic != null and topic != ''"> AND topic = #{topic}</if>
+        <if test="dataType != null and dataType != ''"> AND data_type = #{dataType}</if>
+        <if test="minValue != null"> AND value &gt;= #{minValue}</if>
+        <if test="maxValue != null"> AND value &lt;= #{maxValue}</if>
+        ORDER BY received_at ${sort}
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMessages" resultType="int">
+        SELECT COUNT(*) FROM iot_messages
+    </select>
+
+    <delete id="deleteOldestMessages">
+        DELETE FROM iot_messages
+        WHERE id IN (
+            SELECT id FROM iot_messages ORDER BY received_at ASC LIMIT #{deleteCount}
+        )
+    </delete>
+</mapper>
